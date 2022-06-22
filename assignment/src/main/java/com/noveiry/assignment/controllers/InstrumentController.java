@@ -23,6 +23,7 @@ import com.noveiry.assignment.models.IsinModel;
 
 @RestController
 public class InstrumentController {
+
     @GetMapping(value = "/v1.0/instruments")
 	public ResponseEntity<String> getInstrumentAll(){
         String outputString = callThirdparty();
@@ -53,28 +54,32 @@ public class InstrumentController {
         return new ResponseEntity<IsinModel>(outputIsin,HttpStatus.OK);
     }
 
-    @GetMapping(value = "/v1.0/instrument/date/{isin}/{start}/{end}")
+
+    @GetMapping(value = "/v1.0/instrument/{isin}/{start}/{end}")
 	public ResponseEntity<IsinModel> getInstrumentByEventDate(@PathVariable("isin") String isin,@PathVariable("start") String fromDate,@PathVariable("end") String toDate) throws ParseException{
         String outputString = callThirdparty();
         IsinModel outputIsin = new IsinModel();
 
         ObjectMapper om = new ObjectMapper();
         IsinModel[] root;
-        
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd");
+        /*converting string dates with a special format */
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        /*start json process */
         try {
             root = om.readValue(outputString, IsinModel[].class);
+            /*loop for control isin key value */
             for (int i = 0 ; i < root.length ; i++) {
                 if ( root[i].getIsin().equalsIgnoreCase(isin) ) {
                     ArrayList<EventModel> events = root[i].getEvents();
-
+                    ArrayList<EventModel> changedEvents = new ArrayList<>();
+                    /*loop for control event date */
                     for (int j = 0 ; j < events.size() ; j++){
                         EventModel temp = events.get(j);
-                        if (sdf.parse(temp.getDate()).after(sdf.parse(toDate)) || sdf.parse(temp.getDate()).before(sdf.parse(fromDate))){
-                            events.remove(j);
-                        }
+                        if (sdf.parse(temp.getDate()).before(sdf.parse(toDate)) && sdf.parse(temp.getDate()).after(sdf.parse(fromDate))){
+                            changedEvents.add(temp);
+                        } 
                     }
-                    root[i].setEvents(events);
+                    root[i].setEvents(changedEvents);
                     outputIsin = root[i];
                     break;
                 }  
@@ -87,6 +92,7 @@ public class InstrumentController {
 
     }
 
+    /*this function will handle all 3rd party call */
     private String callThirdparty(){
         try {
             URL url = new URL("https://ssr.finanstilsynet.no/api/v2/instruments");
