@@ -6,6 +6,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.noveiry.assignment.models.EventModel;
 import com.noveiry.assignment.models.IsinModel;
 
 @RestController
@@ -47,6 +51,40 @@ public class InstrumentController {
         }
                   
         return new ResponseEntity<IsinModel>(outputIsin,HttpStatus.OK);
+    }
+
+    @GetMapping(value = "/v1.0/instrument/date/{isin}/{start}/{end}")
+	public ResponseEntity<IsinModel> getInstrumentByEventDate(@PathVariable("isin") String isin,@PathVariable("start") String fromDate,@PathVariable("end") String toDate) throws ParseException{
+        String outputString = callThirdparty();
+        IsinModel outputIsin = new IsinModel();
+
+        ObjectMapper om = new ObjectMapper();
+        IsinModel[] root;
+        
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd");
+        try {
+            root = om.readValue(outputString, IsinModel[].class);
+            for (int i = 0 ; i < root.length ; i++) {
+                if ( root[i].getIsin().equalsIgnoreCase(isin) ) {
+                    ArrayList<EventModel> events = root[i].getEvents();
+
+                    for (int j = 0 ; j < events.size() ; j++){
+                        EventModel temp = events.get(j);
+                        if (sdf.parse(temp.getDate()).after(sdf.parse(toDate)) || sdf.parse(temp.getDate()).before(sdf.parse(fromDate))){
+                            events.remove(j);
+                        }
+                    }
+                    root[i].setEvents(events);
+                    outputIsin = root[i];
+                    break;
+                }  
+            }
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+
+        return new ResponseEntity<IsinModel>(outputIsin,HttpStatus.OK);
+
     }
 
     private String callThirdparty(){
